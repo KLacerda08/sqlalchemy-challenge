@@ -32,58 +32,8 @@ Base.classes.keys()
 measurement = Base.classes.measurement
 station = Base.classes.station
 
-# Create our session (link) from Python to the DB
-session = Session(engine)
-
-## Queries and data 
-latest_date = session.query(measurement.date).order_by(measurement.date.desc()).first()
-
-start_date = dt.date(2017, 8, 23) - dt.timedelta(days=365)
-print(start_date)
-
-# Perform a query to retrieve the data and precipitation scores
-#note that func.avg ignores null values so that they are not factored into the average.  
-
-last_year = session.query(measurement.date, func.avg(measurement.prcp)).\
-    filter(measurement.date > start_date).\
-    group_by(measurement.date).all() 
-
-# Save the query results as a Pandas DataFrame and set the index to the date column
-prcp_df = pd.DataFrame(last_year, columns = ['Date', 'Precip (in)'])
-prcp_df.set_index('Date',inplace=True)
-prcp_df['Precip (in)'] = prcp_df['Precip (in)'].round(2)
-
-# Sort the dataframe by date (although it already looks to be sorted by date)
-prcp_df = prcp_df.sort_index(ascending=True)
-
 ##----------------------------------------------------------------------------------
-## FLASK QUESTIONS ##
-#Get start and end dates for most frequently observed station
-latest_date2 = session.query(measurement.date).\
-        filter(measurement.station == 'USC00519281').\
-        order_by(measurement.date.desc()).first()
-
-start_date2 = dt.date(2017, 8, 18) - dt.timedelta(days=365)
-
-prcp_dict = prcp_df.to_dict()
-
-sta_list = session.query(station.station).order_by(station.station).all()
-
-top_sta = session.query(measurement.station).\
-        group_by(measurement.station).\
-        order_by(func.count(measurement.station).desc()).first()
-
-tobs2 = session.query(measurement.date, measurement.tobs).\
-        filter(measurement.station == 'USC00519281').\
-        filter(measurement.date > start_date2).all()
-
-# Convert to dictionary
-tobs2_df = pd.DataFrame(tobs2, columns = ["Date", 'tobs'])
-tobs2_df.set_index('Date',inplace=True)
-tobs2_df = tobs2_df.sort_index(ascending=True)
-tobs2_dict = tobs2_df.to_dict()
-##----------------------------------------------------------------------------------
-##----------------------------------------------------------------------------------
+## FLASK APP  ##
 
 ## create app
 app = Flask(__name__)
@@ -91,96 +41,146 @@ app = Flask(__name__)
 ## Define routes
 @app.route('/')
 def home():
+
     print("Someone is accessing the homepage")
     return(
         f"<h1>Welcome to our Weather Data Homepage!</h1>"
         f"<h2>Available Routes:</h2>"
-        f"/api/v1.0/precipitation<br/>"
-        f"/api/v1.0/stations<br/>"
-        f"/api/v1.0/tobs_top_station_id<br/>"
-        f"/api/v1.0/tobs<br/>"
-        f"/api/v1.0/YYYY-MM-DD<br/>"
-        f"/api/v1.0/YYYY-MM-DD/YYYY-MM-DD<br/>"
-        f"/about")
+        f"About Us: <br/>/about<br/><br/>"
+        f"Precipitation Data:  <br/>/api/v1.0/precipitation<br/><br/>"
+        f"Station List:  <br/>/api/v1.0/stations<br/><br/>"
+        f"Top Measured Station ID:  <br/>/api/v1.0/id_top_station<br/><br/>"
+        f"Temperature Data from Top Station: <br/>/api/v1.0/tobs_top_station<br/><br/>"
+        f"Temperature Stats by Start Date (YYYY-MM-DD): <br/>/api/v1.0/start<br/><br/>"
+        f"Temperature Stats by Date Range (YYYY-MM-DD): <br/>/api/v1.0/start/end")
 
+@app.route("/about")
+def about(): 
+    return (
+            f"Welcome!  We provide weather data for Hawaii! <br/>"
+            f"To search temperature data by date, use date format: YYYY-MM-DD.<br/>"
+            f"The most frequently measured station ID can be found at the following route:\
+                /api/v1.0/id_top_station<br/>")
 
 @app.route('/api/v1.0/precipitation')
 def precipitation():
-    # Using the query from part 1 (most recent 12 months of precipitation data), convert the query results to a dictionary using date as the key and prcp as the value.
-    # Return the JSON representation of your dictionary (note the specific format of your dictionary as required from above).
+    session = Session(engine)
+
+    # Using the query from part 1 (most recent 12 months of precipitation data), 
+    # convert the query results to a dictionary using date as the key and prcp as the value.
+    latest_date = session.query(measurement.date).order_by(measurement.date.desc()).first()
+    start_date = dt.date(2017, 8, 23) - dt.timedelta(days=365)
+    
+    last_year = session.query(measurement.date, func.avg(measurement.prcp)).\
+        filter(measurement.date > start_date).\
+        group_by(measurement.date).all() 
+
+    # Save the query results as a Pandas DataFrame, set the index to the date column, round precip values
+    prcp_df = pd.DataFrame(last_year, columns = ['Date', 'Precip (in)'])
+    prcp_df.set_index('Date',inplace=True)
+    prcp_df['Precip (in)'] = prcp_df['Precip (in)'].round(2)
+    
+    # Sort the dataframe by date and put into dictionary
+    prcp_df = prcp_df.sort_index(ascending=True)
+    prcp_dict = prcp_df.to_dict()
+    
+    session.close()
     return jsonify(prcp_dict)
 
 @app.route('/api/v1.0/stations')
 def stations():
+    session = Session(engine)
+
     #Get Station List
-    #Return a JSON list of stations from the dataset.
+    sta_list = session.query(station.station).order_by(station.station).all()
+    
+    session.close()
     return jsonify(sta_list)
 
-@app.route('/api/v1.0/tobs_top_station_id')
-def tobs_top_station_id():
-    # Added this page to list the "top station" so that the tobs data can make a little sense.  
-    return (
-        f'<h3>The most frequently measured weather station from {start_date2} to {latest_date2} was:<h3>'
-        f'&nbsp &nbsp {top_sta}')
 
-@app.route('/api/v1.0/tobs')
+@app.route('/api/v1.0/id_top_station')
+def id_top_station():
+    # Added this page to list the "top station" so that the tobs page can make sense to the user.  
+    session = Session(engine)
+    
+    # Query the dates and temperature observations of the most active station for the latest year of data.
+    top_sta = session.query(measurement.station).\
+        group_by(measurement.station).\
+        order_by(func.count(measurement.station).desc()).first()
+
+    latest_date2 = session.query(measurement.date).\
+        filter(measurement.station == 'USC00519281').\
+        order_by(measurement.date.desc()).first()
+
+    start_date2 = dt.date(2017, 8, 18) - dt.timedelta(days=365)
+
+    session.close()
+    return (
+        f'<h3>The most frequently measured weather station for the most recent year of data ({start_date2} to \
+            {latest_date2}) was:</h3> &nbsp &nbsp {top_sta}')
+
+@app.route('/api/v1.0/tobs_top_station')
 def tobs():
-        # Query the dates and temperature observations of the most active station for the latest year of data.
-        # Return a JSON list of temperature observations (TOBS) for that year.
+    session = Session(engine) 
+
+    #Redefine dates for this session query
+    latest_date2 = session.query(measurement.date).\
+        filter(measurement.station == 'USC00519281').\
+        order_by(measurement.date.desc()).first()
+
+    start_date2 = dt.date(2017, 8, 18) - dt.timedelta(days=365)
+    #Get tobs from the station identified in the prior page(USC00519281)
+
+    tobs2 = session.query(measurement.date, measurement.tobs).\
+        filter(measurement.station == 'USC00519281').\
+        filter(measurement.date > start_date2).all()
+    
+    # Convert to dictionary
+    tobs2_df = pd.DataFrame(tobs2, columns = ["Date", 'tobs'])
+    tobs2_df.set_index('Date',inplace=True)
+    tobs2_df = tobs2_df.sort_index(ascending=True)
+    tobs2_dict = tobs2_df.to_dict()
+    
+    session.close()
     return jsonify(tobs2_dict)
-        
+
+
 @app.route('/api/v1.0/<start>')
 def search_by_start_date(start):
     session = Session(engine)
-    # start = input("Input start date (YYYY-MM-DD):  ")
+    
+    #calculate min, max, and avg for all dates greater than and equal to the queried start date.  
+
     sel = [func.min(measurement.tobs),
         func.max(measurement.tobs),
-        func.avg(measurement.tobs)]        
+        func.avg(measurement.tobs)]
 
-    query_search = session.query(*sel).filter(measurement.date >= start).all()
-    results = list(np.ravel(query_search))
+    startdate_stats = session.query(*sel).filter(measurement.date >= start).all()
 
-    ##could put min max ave in dict and return jsonify(dict)
+    tobs_start = pd.DataFrame(startdate_stats, columns = ["Min Temp", 'Max Temp', "Avg Temp"])
+    tobs_start = tobs_start.to_dict()
+
     session.close()
-
-    return jsonify(results)
+    return jsonify(tobs_start)
 
 @app.route('/api/v1.0/<start>/<end>')
 def search_by_date_range(start, end):
     session = Session(engine)
-    # start = input("Input start date (YYYY-MM-DD):  ")
+
+    #calculate min, max, and avg for all dates between the queried start and end dates:
+
     sel = [func.min(measurement.tobs),
         func.max(measurement.tobs),
         func.avg(measurement.tobs)]        
    
-    # query_search = session.query(*sel).where(between(measurement.date, start, end).all()
-    query_search = session.query(*sel).filter(measurement.date >= start).\
+    date_range_stats = session.query(*sel).filter(measurement.date >= start).\
         filter(measurement.date <= end).all()
 
-    results = list(np.ravel(query_search))
+    tobs_date_range = pd.DataFrame(date_range_stats, columns = ["Min Temp", 'Max Temp', "Avg Temp"])
+    tobs_date_range = tobs_date_range.to_dict()
 
-    ##could put min max ave in dict and return jsonify(dict)
     session.close()
-
-    return jsonify(results)
-
-
-#for start end, use a func.between (-check sql for syntax) or add new .filter(measurement.date
-# # <end).all() 
-
-#/api/v1.0/<start>/<end>
-    # Create a query that returns the minimum temperature, the average temperature, and the max temperature for 
-    # a given start or start-end range.
-    #     Hint: You will need to use a function such as func.min, func.max, func.avg, and func.count in your queries.
-    # When given the start date only, calculate min, max, and avg for all dates greater than and equal to the start date.
-    # When given the start and the end date, calculate the min, avg, and max for dates between the start and end date inclusive.
-    # Return a JSONified dictionary of min, max, and avg temperatures.
-
-
-@app.route("/about")
-def about(): 
-    return f"We evaluate temperature data for Hawaii."
-
+    return jsonify(tobs_date_range)
 
 if __name__ == "__main__":
     app.run(debug=True)
