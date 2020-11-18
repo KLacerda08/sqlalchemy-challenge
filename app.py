@@ -93,14 +93,14 @@ app = Flask(__name__)
 def home():
     print("Someone is accessing the homepage")
     return(
-        f"<h1>Welcome to our homepage!</h1>"
+        f"<h1>Welcome to our Weather Data Homepage!</h1>"
         f"<h2>Available Routes:</h2>"
         f"/api/v1.0/precipitation<br/>"
         f"/api/v1.0/stations<br/>"
         f"/api/v1.0/tobs_top_station_id<br/>"
         f"/api/v1.0/tobs<br/>"
-        f"/api/v1.0/start/<start><br/>"
-        f"/api/v1.0/<start>/<end>"
+        f"/api/v1.0/YYYY-MM-DD<br/>"
+        f"/api/v1.0/YYYY-MM-DD/YYYY-MM-DD<br/>"
         f"/about")
 
 
@@ -129,17 +129,44 @@ def tobs():
         # Return a JSON list of temperature observations (TOBS) for that year.
     return jsonify(tobs2_dict)
         
-@app.route('/api/v1.0/start/<start>')
+@app.route('/api/v1.0/<start>')
 def search_by_start_date(start):
-    start = input("Input start date (YYYY-MM-DD):  ")
-    
+    session = Session(engine)
+    # start = input("Input start date (YYYY-MM-DD):  ")
     sel = [func.min(measurement.tobs),
         func.max(measurement.tobs),
         func.avg(measurement.tobs)]        
 
     query_search = session.query(*sel).filter(measurement.date >= start).all()
-    return(query_search)
+    results = list(np.ravel(query_search))
 
+    ##could put min max ave in dict and return jsonify(dict)
+    session.close()
+
+    return jsonify(results)
+
+@app.route('/api/v1.0/<start>/<end>')
+def search_by_date_range(start, end):
+    session = Session(engine)
+    # start = input("Input start date (YYYY-MM-DD):  ")
+    sel = [func.min(measurement.tobs),
+        func.max(measurement.tobs),
+        func.avg(measurement.tobs)]        
+   
+    # query_search = session.query(*sel).where(between(measurement.date, start, end).all()
+    query_search = session.query(*sel).filter(measurement.date >= start).\
+        filter(measurement.date <= end).all()
+
+    results = list(np.ravel(query_search))
+
+    ##could put min max ave in dict and return jsonify(dict)
+    session.close()
+
+    return jsonify(results)
+
+
+#for start end, use a func.between (-check sql for syntax) or add new .filter(measurement.date
+# # <end).all() 
 
 #/api/v1.0/<start>/<end>
     # Create a query that returns the minimum temperature, the average temperature, and the max temperature for 
