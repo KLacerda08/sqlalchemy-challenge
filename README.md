@@ -31,14 +31,14 @@ columns in each. Queries were designed to find the following data:
 
 ![Title](Images/daily_precip_time.png)
 
-	The results show that the most consistent spans of heavy rain generally occured between February and early March, mid April to early May. 
+  The results show that the most consistent spans of heavy rain generally occured between February and early March, mid April to early May. 
 	However, the highest precipitation occured in September, suggesting a weather event such as a hurricane.    
 
 2. To evaluate precipitation data on a monthly scale, the average precipitation per month was also calculated and visualized:  
 
 ![Title](Images/monthly_precip.png)
 
-	The monthly results suggest that late August to September have the most average rain. However, these monthly averages may be influenced 
+  The monthly results suggest that late August to September have the most average rain. However, these monthly averages may be influenced 
 	by weather events, such as hurricanes.  Using 0.15 inches per day as an average upper limits, if  a vacation wanted to avoid the rain, 
 	the best times to visit Hawaii would be from May to early August, October to November, or in January.  
  
@@ -57,7 +57,7 @@ columns in each. Queries were designed to find the following data:
 
 ![Title](Images/hist_temps.png)
 
-	Based on these data, the climate of Hawaii is generally mild, with most temperature observations falling between approximately 67.5 
+  Based on these data, the climate of Hawaii is generally mild, with most temperature observations falling between approximately 67.5 
 	and 81 degrees Fahrenheit.  
 
 7. A weather app was designed to allow the user to query temperature and precipitation data as follows:  
